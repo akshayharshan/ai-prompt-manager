@@ -4,9 +4,10 @@ sqlalchemy>=2
 asyncpg
 psycopg2-binary
 python-dotenv
-passlib[bcrypt]
+passlib[argon2]
 python-jose[cryptography]
 alembic
 pydantic
+pydantic[email]
 openai
 gunicorn
