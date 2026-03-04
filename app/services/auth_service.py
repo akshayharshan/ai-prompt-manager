@@ -5,7 +5,7 @@ from fastapi import Depends
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate
-from app.core.security import SECRET_KEY, ALGORITHM,create_access_token, hash_password, verify_password,oauth2_scheme
+from app.core.security import SECRET_KEY, ALGORITHM,create_access_token, create_refresh_token, hash_password, verify_password,oauth2_scheme
 from jose import JWTError,jwt
 
 
@@ -38,7 +38,12 @@ async def login_user(db:AsyncSession,email:str,password:str):
         raise HTTPException(status_code=401,detail="Invalid credentials")
     
     access_token = create_access_token({"sub":str(user.id)})
-    return {"access_token": access_token} 
+    refresh_token = create_refresh_token({"sub" :str(user.id)})
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type":"bearer"
+        } 
 
 async def get_current_user(token: str = Depends(oauth2_scheme),db: AsyncSession = Depends(get_db)):
     try:
@@ -55,3 +60,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme),db: AsyncSession 
     if user is None:
         raise HTTPException(status_code=401,detail="User not found")
     return user
+def require_admin(current_user: User=Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403,detail="Admin only")
+    return current_user

@@ -1,12 +1,14 @@
+from app.core.security import ALGORITHM, SECRET_KEY, create_access_token, create_refresh_token
 from app.schemas.user import UserCreate
 from app.schemas.auth import TokenResponse,LoginRequest
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.services.auth_service import register_user,login_user
+from app.services.auth_service import register_user,login_user, require_admin
 from app.services.auth_service import get_current_user
 from app.models import User
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import JWTError,jwt
 
 
 
@@ -27,4 +29,20 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "id": current_user.id,
         "email" : current_user.email
     }
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(token:str):
+    payload = jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+    user_id = payload.get("sub")
+    new_access_token = create_access_token({"sub": user_id})
+    new_refresh_token = create_refresh_token({"sub":user_id})
+    return{
+        "access_token" : new_access_token,
+        "refresh_token" : new_refresh_token,
+        "token_type": "bearer"
+    }
+
+@router.get("/admin")
+async def admin_route(user: User = Depends(require_admin)):
+    return {"message": "welcome admin"}
 
