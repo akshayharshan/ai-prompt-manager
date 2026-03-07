@@ -7,6 +7,7 @@ from app.models.user import User
 from app.schemas.user import UserCreate
 from app.core.security import SECRET_KEY, ALGORITHM,create_access_token, create_refresh_token, hash_password, verify_password,oauth2_scheme
 from jose import JWTError,jwt
+from app.core.redis import redis_client
 
 
 
@@ -39,6 +40,11 @@ async def login_user(db:AsyncSession,email:str,password:str):
     
     access_token = create_access_token({"sub":str(user.id)})
     refresh_token = create_refresh_token({"sub" :str(user.id)})
+    redis_client.setex(
+        f"refresh:{refresh_token}",
+        7 * 24 *60*60,
+        user.id    
+        )
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,

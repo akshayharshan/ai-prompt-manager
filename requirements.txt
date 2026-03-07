@@ -12,3 +12,4 @@ pydantic[email]
 openai
 gunicorn
 python-multipart
+redis

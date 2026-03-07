@@ -1,3 +1,5 @@
+from sqlalchemy import delete
+from app.core.redis import redis_client
 from app.core.security import ALGORITHM, SECRET_KEY, create_access_token, create_refresh_token
 from app.schemas.user import UserCreate
 from app.schemas.auth import TokenResponse,LoginRequest
@@ -9,7 +11,8 @@ from app.services.auth_service import get_current_user
 from app.models import User
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError,jwt
-
+from app.core.rate_limiter import rate_limit
+from fastapi import Request
 
 
 
@@ -20,7 +23,8 @@ async def register(user_data:UserCreate, db: AsyncSession = Depends(get_db)):
     return await register_user(user_data,db)
 
 @router.post("/login",response_model=TokenResponse)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(),db:AsyncSession = Depends(get_db)):
+async def login(request: Request,form_data: OAuth2PasswordRequestForm = Depends(),db:AsyncSession = Depends(get_db)):
+    await rate_limit(request)
     return await login_user(db,form_data.username,form_data.password)
 
 @router.get("/me")
@@ -34,8 +38,15 @@ async def get_me(current_user: User = Depends(get_current_user)):
 async def refresh_token(token:str):
     payload = jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
     user_id = payload.get("sub")
+    #rotate token
+    redis_client = delete(f"refresh:{token}")
     new_access_token = create_access_token({"sub": user_id})
     new_refresh_token = create_refresh_token({"sub":user_id})
+
+    redis_client.setex(
+        f"refresh:{new_refresh_token}",
+        7 * 24 * 60 * 60
+    )
     return{
         "access_token" : new_access_token,
         "refresh_token" : new_refresh_token,
